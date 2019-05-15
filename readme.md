@@ -30,12 +30,13 @@ and installing Julia, below.
 The R and Julia codes are used in the manuscript titled "Adding noise to Markov cohort models."
 
 Please email author at rowan_iskandar@brown.edu for any questions.
-```
 
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+# References
 
-Please make sure to update tests as appropriate.
+Example 1 is based on: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0205543
 
-## License
-[MIT](https://choosealicense.com/licenses/mit/)
+Example 2 is based on: https://onlinelibrary.wiley.com/doi/abs/10.1111/tbj.12757
+
+# About author
+
+https://vivo.brown.edu/display/riskanda
