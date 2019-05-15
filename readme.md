@@ -18,7 +18,28 @@ computing.  The main homepage for Julia can be found at
 repository of Julia source code, including instructions for compiling
 and installing Julia, below.
 
-## Resources
+### Terminal, Editors and IDEs
+
+The Julia REPL is quite powerful.  See the section in the manual on
+[the Julia REPL](https://docs.julialang.org/en/latest/stdlib/REPL/)
+for more details.
+
+Support for editing Julia is available for many
+[widely used editors](https://github.com/JuliaEditorSupport):
+[Emacs](https://github.com/JuliaEditorSupport/julia-emacs),
+[Vim](https://github.com/JuliaEditorSupport/julia-vim),
+[Sublime Text](https://github.com/JuliaEditorSupport/Julia-sublime), and many
+others.
+
+Supported IDEs include: [Juno](http://junolab.org/) (Atom plugin),
+[julia-vscode](https://github.com/JuliaEditorSupport/julia-vscode) (VS
+Code plugin), and
+[julia-intellij](https://github.com/JuliaEditorSupport/julia-intellij)
+(IntelliJ IDEA plugin). The popular [Jupyter](https://jupyter.org/)
+notebook interface is available through
+[IJulia](https://github.com/JuliaLang/IJulia.jl).
+
+### Resources
 
 - **Homepage:** <https://julialang.org>
 - **Binaries:** <https://julialang.org/downloads/>
