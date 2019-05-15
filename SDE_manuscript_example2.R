@@ -6,7 +6,7 @@
 #author: Rowan Iskandar
 #email: rowan_iskandar@brown.edu
 #last edited: May 10 2019
-#The code for the numerical exercise is available under a GNU GPL license and can be found at https://github.com/rowaniskandar/CM_ME_plosone.
+#The code for the numerical exercise is available under a GNU GPL license and can be found at https://github.com/rowaniskandar/SDE.
 ##############################################################################
 ##############################################################################
 #loading relevant libraries
