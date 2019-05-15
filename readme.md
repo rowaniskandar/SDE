@@ -2,11 +2,15 @@
 
 Please refer to each file (.jl and .R) to find the required packages prior to running the codes.
 
-The file, cohmod.jl, is required for running the examples in Julia. 
+## Julia
+The file, cohmod.jl, is required for running the examples in Julia. One key package is DifferentialEquations package (https://github.com/JuliaDiffEq/DifferentialEquations.jl).
 
-The R codes are self-contained
+## R
+The R codes are self-contained.  One key package is the YUIMA package (https://github.com/cran/yuima).
 
 ## The Julia Language
+
+Julia language is not used widespread in decision modeling.  Here are some of the main sites for new users.
 
 Julia is a high-level, high-performance dynamic language for technical
 computing.  The main homepage for Julia can be found at
