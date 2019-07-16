@@ -5,83 +5,37 @@
 #under review at MDM journal
 #author: Rowan Iskandar
 #email: rowan_iskandar@brown.edu
-#last edited: May 10 2019
+#last edited: July 8 2019
 #The code for the numerical exercise is available under a GNU GPL license and can be found at https://github.com/rowaniskandar/SDE.
 ##############################################################################
 ##############################################################################
 #loading relevant libraries
-library(yuima)
+library(yuima) #critical for stochastic differential equation method
 library(deSolve)
 library(ggplot2)
 library(reshape2)
 library(expm)
 library(pracma)
-library(markovchain)
+library(markovchain) #critical for microsimulation
 library(matrixcalc)
 library(openxlsx)
+#setting directory name
 currpath <- dirname(rstudioapi::callFun("getActiveDocumentContext")$path)  
 set.seed(12345)
 ##############################################################################
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  require(grid)
-  
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-  
-  numPlots = length(plots)
-  
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                     ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-  
-  if (numPlots==1) {
-    print(plots[[1]])
-    
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-    
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-      
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
-
 ##############################################################################
 ##############################################################################
 #parameter values for breast cancer toxicity model
 #reference: Alarid‐Escudero, Fernando, Anne H. Blaes, and Karen M. Kuntz. "Trade‐offs Between Efficacy and Cardiac Toxicity of Adjuvant Chemotherapy in Early‐Stage Breast Cancer Patients: Do Competing Risks Matter?." The breast journal 23.4 (2017): 401-409.
 ##############################################################################
-popsize <- 1000
+#basic dynamic parameters (time duration, population size)
+popsize <- 1000 #population size
 ns <- 7 #number of states
 nMC <-10000 # number of micro sim iterations
 t0 <- 0 #initial time
 tfin <-50 #final time
 dt <- 1 #time step
 tpoints <- seq(t0,tfin,dt) #number of discrete time points
-# d=[-1 1 0 0 0 0 0;
-#    -1 0 1 0 0 0 0;
-#    -1 0 0 0 1 0 0;
-#    0 -1 0 1 0 0 0;
-#    0 -1 0 0 1 0 0;
-#    0 -1 0 0 0 0 1;
-#    0 0 -1 1 0 0 0;
-#    0 0 -1 0 1 0 0;
-#    0 0 -1 0 0 1 0;
-#    0 0 0 -1 1 0 0;
-#    0 0 0 -1 0 1 0;
-#    0 0 0 -1 0 0 1]
 muDieASR = c(0.004808,0.005185,0.005562,0.005936,0.006323,0.006739,0.007208,0.007742,0.008349,0.009024,0.009754,0.010550,0.011452,0.012489,0.013714)
 muDieASR = 1/30
 muMets = 0.06
@@ -94,7 +48,7 @@ muDieASR = 1/30
 rrC_noch = 1
 rrC_ch = 0.216
 rrC_ac = 0.23
-#noch arm
+#transition rates
 c12=muTox_ac
 c12_noch=0
 c13=muMets
@@ -111,8 +65,10 @@ c37=muDieASR
 c47=muDieASR
 c45=muDieTox
 c46=muDieMets
+#setting up the c vector of transition rates
 params_noch=c(c12_noch,c13,c17,c24,c25,c27,c34_noch,c36,c37,c45,c46,c47)
 params_ac=c(c12,c13_ac,c17,c24_ac,c25,c27,c34,c36,c37,c45,c46,c47)
+#setting up q-matrix (used in microsimulation)
 Q_noch=matrix(c(-(c12_noch+c13+c17), c12_noch, c13, 0, 0, 0, c17,
         0, -(c24+c25+c27), 0, c24, c25, 0, c27,
         0, 0, -(c34_noch+c36+c37), c34_noch, 0, c36, c37,
@@ -128,25 +84,26 @@ Q_ac=matrix(c(-(c12+c13_ac+c17), c12, c13_ac, 0, 0, 0, c17,
               0, 0, 0, 0, 0, 0, 0,
               0, 0, 0, 0, 0, 0, 0),nrow=ns,ncol=ns,byrow=TRUE)
 init <-c(popsize,0,0,0,0,0,0) #initial state configuration
-
 ##############################################################################
 ##############################################################################
-##SDE 
-#####yuima package method
-y<-1
+##stochastic differential equation method
+##use yuima package method
+y<-1 #step size for Euler Maruyama
 tpoints <- seq(t0,tfin,dt/y) #number of discrete time points
-sol <- c("n1","n2","n3","n4","n5","n6","n7")
-#for correlated Wiener:
-rho <-0.9
-sigma <- matrix(c(1,rho,rho,rho,rho,rho,rho,
-                  rho,1,rho,rho,rho,rho,rho,
-                  rho,rho,1,rho,rho,rho,rho,
-                  rho,rho,rho,1,rho,rho,rho,
-                  rho,rho,rho,rho,1,rho,rho,
-                  rho,rho,rho,rho,rho,1,rho,
-                  rho,rho,rho,rho,rho,rho,1,
-),nrow=ns,ncol=n2,byrow=TRUE)
-C <- chol(sigma)
+sol <- c("n1","n2","n3","n4","n5","n6","n7") #health states
+#for correlated Wiener (not needed):
+# rho <-0.9
+# sigma <- matrix(c(1,rho,rho,rho,rho,rho,rho,
+#                   rho,1,rho,rho,rho,rho,rho,
+#                   rho,rho,1,rho,rho,rho,rho,
+#                   rho,rho,rho,1,rho,rho,rho,
+#                   rho,rho,rho,rho,1,rho,rho,
+#                   rho,rho,rho,rho,rho,1,rho,
+#                   rho,rho,rho,rho,rho,rho,1,
+# ),nrow=ns,ncol=n2,byrow=TRUE)
+# C <- chol(sigma)
+#ac/chemo arm
+#drift vector
 A_ac <-c("-n1*(c12+c13_ac+c17)",
       "n1*c12-n2*(c24_ac+c25+c27)",
       "n1*c13_ac-n3*(c34+c36+c37)",
@@ -154,6 +111,7 @@ A_ac <-c("-n1*(c12+c13_ac+c17)",
       "n2*c25+n4*c45",
       "n3*c36+n4*c46",
       "n1*c17+n2*c27+n3*c37+n4*c47")
+#diffusion matrix
 B_ac <-matrix(c("n1*(c12+c13_ac+c17)","-n1*c12","-n1*c13_ac",0 ,0,0 ,"-n1*c17",
            "-n1*c12","n1*c12+n2*(c24_ac+c25+c27)",0, "-n2*c24_ac", "-n2*c25",0 ,"-n2*c27",
            "-n1*c13_ac",0,"n1*c13+n3*(c34+c36+c37)", "-n3*c34", 0, "-n3*c36", "-n3*c37",
@@ -162,7 +120,8 @@ B_ac <-matrix(c("n1*(c12+c13_ac+c17)","-n1*c12","-n1*c13_ac",0 ,0,0 ,"-n1*c17",
               0, 0, "-n3*c36","-n4*c46", 0 , "n3*c36+n4*c46" , 0,
            "-n1*c17","-n2*c27","-n3*c37","-n4*c47",0, 0, "n1*c17+n2*c27+n3*c37+n4*c47")
               ,nrow=7,ncol=7)
-
+#no chemo arm
+#drift vector
 A_noch <-c("-n1*(c12_noch+c13+c17)",
          "n1*c12_noch-n2*(c24+c25+c27)",
          "n1*c13-n3*(c34+c36+c37)",
@@ -170,6 +129,7 @@ A_noch <-c("-n1*(c12_noch+c13+c17)",
          "n2*c25+n4*c45",
          "n3*c36+n4*c46",
          "n1*c17+n2*c27+n3*c37+n4*c47")
+#diffusion matrix
 B_noch <-matrix(c("n1*(c12_noch+c13+c17)","-n1*c12_noch","-n1*c13",0 ,0,0 ,"-n1*c17",
                 "-n1*c12_noch","n1*c12_noch+n2*(c24+c25+c27)",0, "-n2*c24", "-n2*c25",0 ,"-n2*c27",
                 "-n1*c13",0,"n1*c13+n3*(c34+c36+c37)", "-n3*c34", 0, "-n3*c36", "-n3*c37",
@@ -179,10 +139,10 @@ B_noch <-matrix(c("n1*(c12_noch+c13+c17)","-n1*c12_noch","-n1*c13",0 ,0,0 ,"-n1*
                 "-n1*c17","-n2*c27","-n3*c37","-n4*c47",0, 0, "n1*c17+n2*c27+n3*c37+n4*c47")
               ,nrow=7,ncol=7)
 
-
 MCtrace_all <-array(rep(0, nMC*length(tpoints)*ns), dim=c(nMC, length(tpoints), ns))
 MCtrace_all2 <-array(rep(0, nMC*length(tpoints)*ns), dim=c(nMC, length(tpoints), ns))
 tic()
+#sample path loop
 for(m in 1:nMC){
   mod <- setModel(drift=A_ac,diffusion=B_ac,state.variable=sol,solve.variable = sol)
   samp <- setSampling(Initial=t0,Terminal=tfin, n=length(tpoints)-1)
@@ -206,11 +166,11 @@ LEMC <- rep(0,nMC)
 LEsum <- 0
 for (i in 1:nMC){
   LEsum <- 0
-  LEsum <- sum(MCtrace_all[i, ,1])+sum(MCtrace_all[i, ,2])+sum(MCtrace_all[i, ,3])+sum(MCtrace_all[i, ,4])
+  LEsum <- sum(MCtrace_all[i, ,1])+sum(MCtrace_all[i, ,2])+sum(MCtrace_all[i, ,3])+sum(MCtrace_all[i, ,4]) #only considers counts in non-death states
   LEMC[i] <- LEsum/(popsize*y)
 }  
-LEMC_mean <- mean(LEMC)
-LEMC_std <-std(LEMC)
+LEMC_mean <- mean(LEMC) #mean of life expectancy
+LEMC_std <-std(LEMC) #standard deviation of life expectancy
 ####
 meanMC <-dum1/nMC
 varMC <- matrix(rep(0,length(tpoints)*ns), nrow=length(tpoints), ncol=ns)
@@ -267,13 +227,11 @@ data.SDEyui.sdneg <- data.frame(sdnegMC[index_pull,])
 ##############################################################################
 ##############################################################################
 #microsimulation approach
-tpoints <- seq(t0,tfin,dt)
 ##############################################################################
-##############################################################################
-#microsimulation of the breast cancer toxicity model
 tpoints <- seq(t0,tfin,dt)
-sickStates <- c("H","T","M","TM","DT","DTM","DO")
+sickStates <- c("H","T","M","TM","DT","DTM","DO") #health state labels
 Q=Q_ac
+#transition probability matrix, calculated from the Q matrix
 trprob <- expm(Q*tstep)
 P <- trprob
 #check stochastic matrix, make sure row sum = 1
@@ -300,6 +258,7 @@ for (i in 1:ns){
 }
 trprob <- P
 sickP <-matrix(data = trprob,  nrow = ns, ncol=ns, dimnames = list(sickStates,sickStates))
+#use markovchain package
 sickMC <- new("markovchain", states = sickStates , byrow=TRUE, transitionMatrix =sickP , name = "sick")
 
 N <- popsize
@@ -324,13 +283,13 @@ MCtrace <- matrix(rep(0,length(tpoints)*ns), nrow = length(tpoints), ncol = ns)
 MCtrace_all <-array(rep(0, nMC*length(tpoints)*ns), dim=c(nMC, length(tpoints), ns))
 MCtrace_all2 <-array(rep(0, nMC*length(tpoints)*ns), dim=c(nMC, length(tpoints), ns))
 
-tic()
-#start outer outer loop
+tic() #timer start
+#start outer outer loop (sample path)
 for (m in 1:nMC){
+  #start individual path
   for (i in 1:N){
-    sicktrace[i,] <- rmarkovchain(n = tfinal, object = sickMC, t0 = "H")
+    sicktrace[i,] <- rmarkovchain(n = tfinal, object = sickMC, t0 = "H") #generate markov chain using markovchain package
   }
-  
   for (i in 1:N){
     for (j in 1:tfinal){
       if (sicktrace[i,j]=="H"){SHbool[i,j]=1}
@@ -409,7 +368,7 @@ for (t in 2:length(tpoints)){
   sdnegMC_d[t,] <- sdnegMC[t-1,]
   meanMC_d[t,] <- meanMC[t-1,]
 }
-
+#output dataframes of relevant statistics
 data.MC.mean <- data.frame(meanMC_d)
 data.MC.var <- data.frame(varMC)
 data.MC.sdpos <- data.frame(sdposMC_d)
