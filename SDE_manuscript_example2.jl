@@ -2,20 +2,22 @@
 #Examples in manuscript titled:
 #Adding noise to Markov cohort models
 #include functions from the following package
-include("./CohMod.jl")
+include("./CohModjl")
 using Plots
-# using GraphPlot
-# using LightGraphs
-#testing CohMod.jl module
+using CSV
+using JLD2
 #Rowan Iskandar (rowan.iskandar@gmail.com)
 #start 10042019
+#last revised: July 8 2019
+######################################################
 ######################################################
 ######################################################
 #example 2: bc toxicity model
 #https://onlinelibrary.wiley.com/doi/abs/10.1111/tbj.12757
-#list of states (num_s=7)
+#STEP 1
+#list of states (s=7)
 #1: ned, 2: mets, 3: tox, 4: metstox, 5: dieoth, 6: dietox, 7: diemets
-#enumerate transitions (num_r=12)
+#enumerate transitions (r=12)
 #from healthy
 #1-2
 #1-3
@@ -32,6 +34,9 @@ using Plots
 #4-5
 #4-6
 #4-7
+#create matrix of change (matrix d)
+#row: transition type
+#column: change to individual state: increase/decrease by one (+1,-1), or no change (0)
 d=[-1 1 0 0 0 0 0;
 -1 0 1 0 0 0 0;
 -1 0 0 0 0 0 1;
@@ -44,17 +49,23 @@ d=[-1 1 0 0 0 0 0;
 0 0 0 -1 1 0 0;
 0 0 0 -1 0 1 0;
 0 0 0 -1 0 0 1]
+#transition rates common to all intervention arms
 muMets = 0.06
 muTox = 0
 muTox_ch = 0.0054769
 muTox_ac = 0.0054769*2.8659
 muDieMets = 0.282938767
 muDieTox = 0.156064775
-muDieASR = 1/30
+#getting lifetable
+path = dirname(dirname(@__FILE__))
+file_lifetable = string(path,"/codes/lifetable.csv")
+lifetable_df= CSV.read(file_lifetable,datarow=2)
+lifetable =convert(Array,lifetable_df)
+#relative risks
 rrC_noch = 1
 rrC_ch = 0.216
 rrC_ac = 0.23
-#noch arm
+#noch arm-specific transition rates
 c12=muTox_ac
 c12_noch=0
 c13=muMets
@@ -71,9 +82,10 @@ c37=muDieASR
 c45=muDieTox
 c46=muDieMets
 c47=muDieASR
-
+#vector of transition rates (used in propensitive vector v in CohMod.jl)
 c_noch=[c12_noch;c13;c17;c24;c25;c27;c34_noch;c36;c37;c45;c46;c47]
 c_ac=[c12;c13_ac;c17;c24_ac;c25;c27;c34;c36;c37;c45;c46;c47]
+#Q matrix or generator matrix (used in microsimulation)
 Q_noch=[-(c12_noch+c13+c17) c12_noch c13 0 0 0 c17;
 0 -(c24+c25+c27) 0 c24 c25 0 c27;
 0 0 -(c34_noch+c36+c37) c34_noch 0 c36 c37;
@@ -88,103 +100,33 @@ Q_ac=[-(c12+c13_ac+c17) c12 c13_ac 0 0 0 c17;
 0 0 0 0 0 0 0;
 0 0 0 0 0 0 0;
 0 0 0 0 0 0 0]
-popsize = 1000
-nMC = 100000 # number of micro sim iterations
+#basic dynamic parameters (time duration, population size)
+popsize = 1000  #population size
+nMC = 10000 # number of monte carlo samples both for microsimulation and SDE
 t0 = 0 #initial time
 tfin = 45 #final time
 dt = 1 #time step
-dt_scale = 1
-pop_init = [popsize 0 0 0 0 0 0] #initial state configuration
+dt_scale = 1 #for finer time steps in Euler Maruyama algorithm
+pop_init = [popsize 0 0 0 0 0 0]  #initial state configuration
 state_names=["NED" "Tox" "Mets" "Mets+Tox" "DieTox" "DieMets" "DieASR"]
-LEdims=[1 2 3 4]
+LEdims=[1 2 3 4] #flag which column is non-death state (to calculate life expectancy or survival)
 #call module and set global parameter values
-#noch arm
-CohMod.SetParams(state_names,t0,tfin,dt,dt_scale,Q_ac,c_ac,d,pop_init,popsize)
-# g, adjacency_matrix, edgelabel=CohMod.SetGraph()
-# gplot(g,nodelabel=state_names,edgelabel=edgelabel)
+#simulating ac arm
+CohMod_ver2.SetParams(state_names,t0,tfin,dt,dt_scale,c12,c13_ac,c17,c24_ac,c25,c27,c34,c36,c37,c45,c46,c47,d,pop_init,popsize,lifetable)
+#######################################################################
 #call different methods
-@time begin
-elapsedtime_SDE,LEmean_SDE, LEstd_SDE, tpoints, OSmean_SDE, OSstd_SDE, SDEmean_noch, SDEnegsd_noch, SDEpossd_noch = CohMod.StochDiffEquation(nMC,LEdims)
+#first method: SDE
+#####STEP 2-5 are contained in the file CohMod.jl
+@time begin #calculating elapsed time
+elapsedtime_SDE,LEmean_SDE, LEstd_SDE, tpoints, OSmean_SDE, OSstd_SDE, SDEmean_noch, SDEnegsd_noch, SDEpossd_noch = CohMod_ver2.StochDiffEquation(nMC,LEdims)
 #tpoints,  SDEmean_noch, SDEnegsd_noch, SDEpossd_noch = CohMod.StochDiffEquation(nMC,LE,LEdims)
 end
-# plot(tpoints,SDEmean_noch[1,:])
-# plot!(tpoints,SDEmean_noch[2,:])
-# plot!(tpoints,SDEmean_noch[3,:])
-# plot!(tpoints,SDEmean_noch[4,:])
-# plot!(tpoints,SDEmean_noch[5,:])
-# plot!(tpoints,SDEmean_noch[6,:])
-# plot!(tpoints,SDEmean_noch[7,:])
+#######################################################################
+#second method: MicroSimulation
 @time begin
-Ptrans, elapsedtime_MC, LEmean_MSM, LEstd_MSM, tpoints, OSmean_MSM, OSstd_MSM, MCmean_noch, MCnegsd_noch, MCpossd_noch   = CohMod.MicroSimulation(nMC,LEdims)
-#tpoints, MCmean_noch, MCnegsd_noch, MCpossd_noch  = CohMod.MicroSimulation(nMC)
+elapsedtime_MC, LEmean_MSM, LEstd_MSM, tpoints, OSmean_MSM, OSstd_MSM, MCmean_noch, MCnegsd_noch, MCpossd_noch   = CohMod_ver2.MicroSimulation(nMC,LEdims)
 end
-plot(tpoints[1:50],OSmean_MSM[1:50])
-plot!(tpoints[1:50],OSmean_SDE[1:50])
-plot!(tpoints[1:50],OSmean_SDE[1:50]+OSstd_SDE[1:50])
-plot!(tpoints[1:50],OSmean_SDE[1:50]-OSstd_SDE[1:50])
-
-plot(tpoints[1:50],MCmean_noch[1,1:50])
-plot!(tpoints[1:50],SDEmean_noch[1,1:50])
-plot!(tpoints[1:50],MCmean_noch[2,1:50])
-plot!(tpoints[1:50],MCmean_noch[3,1:50])
-plot!(tpoints[1:50],MCmean_noch[4,1:50])
-plot!(tpoints[1:50],MCmean_noch[5,1:50])
-plot!(tpoints[1:50],MCmean_noch[6,1:50])
-plot!(tpoints[1:50],MCmean_noch[7,1:50])
-@time begin
-ODE_noch, ODEstiff_noch = CohMod.DiffEquation(, , Tsit5())
-end
-plot(ODE_noch)
-plot(ODEstiff_noch)
-#ac arm
-CohMod.SetParams(state_names,t0,tfin,dt,dt_scale,Q_ac,c_ac,d,pop_init,popsize)
-#using DiffEqBiological
-# rn = @reaction_network begin
-#     c12, S1 --> S2
-#     c13, S1 --> S3
-#     c15, S1 --> S5
-#     c24, S2 --> S4
-#     c25, S2 --> S5
-#     c27, S2 --> S7
-#     c34, S3 --> S4
-#     c35, S3 --> S5
-#     c36, S3 --> S6
-#     c45, S4 --> S5
-#     c46, S4 --> S6
-#     c47, S4 --> S7
-# end
-# jumprateexpr=rn.jump_rate_expr
-# jumpexpr=rn.jump_affect_expr
-# jumpode=rn.odefun
-# trans=rxtospecies_depgraph(rn)
-# specious=speciestorx_depgraph(rn)
-# rx=rxtorx_depgraph(rn)
-#call different methods
-@time begin
-tpoints,  SDEmean_ac, SDEnegsd_ac, SDEpossd_ac = CohMod.StochDiffEquation(nMC)
-end
-plot(tpoints,SDEmean_ac[1,:])
-plot!(tpoints,SDEmean_ac[2,:])
-plot!(tpoints,SDEmean_ac[3,:])
-plot!(tpoints,SDEmean_ac[4,:])
-plot!(tpoints,SDEmean_ac[5,:])
-plot!(tpoints,SDEmean_ac[6,:])
-plot!(tpoints,SDEmean_ac[7,:])
-
-@time begin
-tpoints, MCmean_ac, MCnegsd_ac, MCpossd_ac  = CohMod.MicroSimulation(nMC)
-end
-plot(tpoints[1:50],MCmean_ac[1,1:50])
-plot!(tpoints[1:50],MCmean_ac[2,1:50])
-plot!(tpoints[1:50],MCmean_ac[3,1:50])
-plot!(tpoints[1:50],MCmean_ac[4,1:50])
-plot!(tpoints[1:50],MCmean_ac[5,1:50])
-plot!(tpoints[1:50],MCmean_ac[6,1:50])
-plot!(tpoints[1:50],MCmean_ac[7,1:50])
-@time begin
-ODE_ac, ODEstiff_ac = CohMod.DiffEquation(, , Tsit5())
-end
-plot(ODE_ac)
-plot(ODEstiff_ac)
+results_1000_10000 = [LEmean_MSM  LEstd_MSM elapsedtime_MC; LEmean_SDE LEstd_SDE elapsedtime_SDE; 0 popsize nMC]
+@save "tmpfile_1000_10000_2.jld" results_1000_10000
 #################################################################
 #end of file
