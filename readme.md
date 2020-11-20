@@ -54,7 +54,7 @@ notebook interface is available through
 
 The R and Julia codes are used in the manuscript titled "Adding noise to Markov cohort models."
 
-Please email author at rowan_iskandar@brown.edu for any questions.
+Please email author at rowan.iskandar@gmail.com for any questions.
 
 # References
 
